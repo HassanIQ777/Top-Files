@@ -1,3 +1,5 @@
+config.ini
+exception_list.txt
 .vscode
 main
 main.o
