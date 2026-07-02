@@ -39,7 +39,7 @@ endif
 OBJS := $(ROOT_OBJS) $(LIB_OBJS)
 
 # ---- Compiler flags ----
-WARNINGS := -Wall -Wextra -Wpedantic -Wshadow -Wconversion
+WARNINGS := -Wall -Wextra -Wpedantic -Wshadow
 
 RELEASE_FLAGS := -std=c++20 -O2 -march=native -flto $(WARNINGS)
 DEBUG_FLAGS   := -std=c++20 -g -Og -DDEBUG $(WARNINGS) \

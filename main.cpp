@@ -55,6 +55,7 @@ int main(int argc, char *argv[]) {
 
   Config config;
   config.load();
+  size_t total_size = 0;
 
   std::vector<std::string> files =
       File::listfiles_recursive(home_dir, config.exception_list);
@@ -66,13 +67,17 @@ int main(int argc, char *argv[]) {
                              }),
               files.end());
 
+  loading_bar_fetching.setMsg("Sorting");
   // sort ascendingly
   std::sort(files.begin(), files.end(),
             [](const std::string &a, const std::string &b) {
               return File::getfilesize(a) < File::getfilesize(b);
             });
+
+  loading_bar_fetching.setMsg("Finding total size");
   size_t largest_width = 0;
   for (const auto &file : files) {
+    total_size += File::getfilesize(file);
     if (file.size() > largest_width)
       largest_width = file.size();
   }
@@ -82,6 +87,11 @@ int main(int argc, char *argv[]) {
     print(strutils::pad_right(file, largest_width), ": ",
           numutils::bytes(File::getfilesize(file)), "\n");
   }
+  if (files.empty()) {
+    print("No files were found.\n");
+  }
 
-  print("\nShowed result for ", files.size(), " files.\n");
+  print("\nShowing diagnosis for \"", home_dir, "\"\n");
+  print("---------------------------------\nFound ", files.size(), " files.\n");
+  print("Total size: ", numutils::bytes(total_size), "\n");
 }
