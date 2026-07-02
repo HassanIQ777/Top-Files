@@ -1,3 +1,7 @@
+.vscode
+main
+main.o
+
 # Prerequisites
 *.d
 
