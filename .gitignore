@@ -1,6 +1,8 @@
 .vscode
 main
 main.o
+topfiles
+topfiles.o
 
 # Prerequisites
 *.d
