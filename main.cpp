@@ -14,6 +14,18 @@ struct Config {
   std::vector<std::string> exception_list; // exception_list.txt
   size_t min_file_size;
 
+  Config() {
+    if (!File::isfile("exception_list.txt")) {
+      File::createfile("exception_list.txt");
+    }
+
+    if (!File::isfile("config.ini")) {
+      File::createfile("config.ini");
+      File::appendline("config.ini",
+                       "min_file_size=10485760"); // 10 MB is the default
+    }
+  }
+
   void load() {
     exception_list = File::readfile("exception_list.txt");
     min_file_size = stoull(File::getFromINI("config.ini", "min_file_size"));
@@ -37,12 +49,21 @@ int main(int argc, char *argv[]) {
   }
 
   Loadingbar::Spinner loading_bar_fetching{
-      {"▏", "▎", "▍", "▌", "▋", "▊", "▉"}, 150, "Fetching files"};
+      {"▏", "▎", "▍", "▌", "▋", "▊", "▉", "▊", "▋", "▌", "▍", "▎"},
+      150,
+      "Fetching files"};
 
-  std::vector<std::string> files = File::listfiles_recursive(home_dir);
-  files.erase(std::remove_if(
-                  files.begin(), files.end(),
-                  [](const std::string &path) { return !File::isfile(path); }),
+  Config config;
+  config.load();
+
+  std::vector<std::string> files =
+      File::listfiles_recursive(home_dir, config.exception_list);
+  files.erase(std::remove_if(files.begin(), files.end(),
+                             [&](const std::string &path) {
+                               return !File::isfile(path) ||
+                                      File::getfilesize(path) <
+                                          config.min_file_size;
+                             }),
               files.end());
 
   // sort ascendingly
@@ -61,4 +82,6 @@ int main(int argc, char *argv[]) {
     print(strutils::pad_right(file, largest_width), ": ",
           numutils::bytes(File::getfilesize(file)), "\n");
   }
+
+  print("\nShowed result for ", files.size(), " files.\n");
 }
