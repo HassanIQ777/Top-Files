@@ -9,17 +9,17 @@ Think of it as `du -ah | sort -h | grep -v "^[0-9]*[KM]\b"`, except it doesn't r
 ## What It Does
 
 ```
-$ topfiles /home/hassan
+$ topfiles /home/user
 
 ▌ Fetching files...
 ▋ Sorting...
 ▌ Finding total size...
 
-/home/hassan/Downloads/ubuntu.iso                   : 1.23 GB
-/home/hassan/Videos/lecture_recording.mkv           : 4.56 GB
-/home/hassan/.local/share/Steam/steamapps/...       : 12.3 GB
+/home/user/Downloads/ubuntu.iso                   : 1.23 GB
+/home/user/Videos/lecture_recording.mkv           : 4.56 GB
+/home/user/.local/share/Steam/steamapps/...       : 12.3 GB
 
-Showing diagnosis for "/home/hassan"
+Showing diagnosis for "/home/user"
 ---------------------------------
 Found 3 files.
 Total size: 18.09 GB
@@ -67,8 +67,8 @@ Change `min_file_size` to any byte value. Some useful ones:
 One path per line. Any file whose full path matches an entry here will be skipped during the scan. Useful for things like `.git` directories, `/proc`, or that one massive file you already know about and are choosing to live with.
 
 ```
-/home/hassan/.local/share/Steam
-/home/hassan/.cache
+/home/user/.local/share/Steam
+/home/user/.cache
 ```
 
 > **Note:** Both config files are looked up relative to the working directory at runtime, not the binary's location. If you install `topfiles` system-wide and call it from `/home/hassan`, that's where it looks for `config.ini`.
@@ -97,7 +97,7 @@ make
 make debug
 
 # Build and run immediately (pass ARGS= for arguments)
-make run ARGS="/home/hassan"
+make run ARGS="$HOME/Downloads"
 
 # Install to /usr/local/bin
 make install
