@@ -71,7 +71,7 @@ One path per line. Any file whose full path matches an entry here will be skippe
 /home/user/.cache
 ```
 
-> **Note:** Both config files are looked up relative to the working directory at runtime, not the binary's location. If you install `topfiles` system-wide and call it from `/home/hassan`, that's where it looks for `config.ini`.
+> **Note:** Both config files are looked up relative to the working directory at runtime, not the binary's location. If you install `topfiles` system-wide and call it from `/home/user`, that's where it looks for `config.ini`.
 
 ---
 
