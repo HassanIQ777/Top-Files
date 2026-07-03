@@ -178,9 +178,12 @@ Top-Files/
 
 ---
 
-## License
-[MIT License](License)
+## MIT License
+[![License: MIT](https://i0.wp.com/opensource.org/wp-content/uploads/2023/03/cropped-OSI-horizontal-large.png)](https://opensource.org/license/mit)
+
 
 ---
 
-*Made by [HassanIQ777](https://github.com/HassanIQ777)*
+## **Made by [HassanIQ777](https://github.com/HassanIQ777)**
+
+### Contributions are welcomed!
