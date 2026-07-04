@@ -6,131 +6,127 @@
 #include "libutils/src/numutils.hpp"
 #include "libutils/src/strutils.hpp"
 #include <algorithm>
+#include <cstdint>
 #include <string>
+#include <unordered_set>
 #include <vector>
+
 using funcs::print;
 
-void listfiles_recursive_internal(
-    const std::string &dir, const std::vector<std::string> &exception_list,
-    std::vector<std::string> &file_list, float min_file_size) {
+struct FileEntry {
+  std::string path;
+  uint64_t size;
+};
+
+namespace {
+
+void collect_files(const std::string &dir,
+                   const std::unordered_set<std::string> &exceptions,
+                   std::vector<FileEntry> &out, uint64_t min_file_size) {
   if (!fs::exists(dir) || !fs::is_directory(dir))
     return;
 
   try {
     for (const auto &entry : fs::directory_iterator(dir)) {
-      std::string current_path = entry.path().string();
+      const std::string current_path = entry.path().string();
 
-      // 1. Check exceptions
-      if (std::find(exception_list.begin(), exception_list.end(),
-                    current_path) != exception_list.end()) {
+      if (exceptions.count(current_path))
         continue;
-      }
 
-      // 2. Distinguish between Files and Directories
-      if (fs::is_regular_file(entry.status()) &&
-          File::getfilesize(current_path) > min_file_size) {
-        file_list.push_back(current_path); // Only add actual files
-      } else if (fs::is_directory(entry.status())) {
-        // Recurse using the same vector reference
-        listfiles_recursive_internal(current_path, exception_list, file_list,
-                                     min_file_size);
+      // don't follow symlinks
+      const auto status = entry.symlink_status();
+
+      if (fs::is_symlink(status)) {
+        continue; // nope
+      } else if (fs::is_regular_file(status)) {
+        const uint64_t size =
+            static_cast<uint64_t>(File::getfilesize(current_path));
+        if (size >= min_file_size)
+          out.push_back({current_path, size});
+      } else if (fs::is_directory(status)) {
+        collect_files(current_path, exceptions, out, min_file_size);
       }
     }
   } catch (const fs::filesystem_error &) {
-    // Log or ignore permission denied errors
+    // Permission denied or file vanished mid scan
   }
 }
 
-// Public wrapper function
-std::vector<std::string>
-listfiles_recursive(const std::string &dir,
-                    const std::vector<std::string> &exception_list,
-                    float min_file_size) {
-  std::vector<std::string> result;
-  listfiles_recursive_internal(dir, exception_list, result, min_file_size);
-  return result;
-}
+} // namespace
 
 struct Config {
-  std::vector<std::string> exception_list; // exception_list.txt
-  size_t min_file_size;
+  std::unordered_set<std::string> exception_list; // exception_list.txt
+  uint64_t min_file_size = 10485760;              // 10 MB default
 
   Config() {
-    if (!File::isfile("exception_list.txt")) {
+    if (!File::isfile("exception_list.txt"))
       File::createfile("exception_list.txt");
-    }
 
     if (!File::isfile("config.ini")) {
       File::createfile("config.ini");
-      File::appendline("config.ini",
-                       "min_file_size=10485760"); // 10 MB is the default
+      File::appendline("config.ini", "min_file_size=10485760");
     }
   }
 
   void load() {
-    exception_list = File::readfile("exception_list.txt");
-    min_file_size = stoull(File::getFromINI("config.ini", "min_file_size"));
+    for (auto &line : File::readfile("exception_list.txt"))
+      exception_list.insert(line);
+
+    try {
+      min_file_size =
+          std::stoull(File::getFromINI("config.ini", "min_file_size"));
+    } catch (const std::exception &) {
+      // config.ini is empty or missing the key
+    }
   }
 };
 
 int main(int argc, char *argv[]) {
-  CLIParser parser(argc, argv);
   if (argc != 2) {
-    if (argc == 1) {
+    if (argc == 1)
       Log::error(true, "Expected 2 arguments, but only one was provided.");
-    } else {
+    else
       Log::error(true, "Expected 2 arguments, but ", funcs::str(argc),
                  " were provided.");
-    }
   }
 
+  CLIParser parser(argc, argv);
   std::string home_dir = parser.getArg(1);
-  if (!File::isdirectory(home_dir)) {
+  if (!File::isdirectory(home_dir))
     Log::error(true, "The provided path is not a directory.");
-  }
 
-  Loadingbar::Spinner loading_bar_fetching{
+  Loadingbar::Spinner loading_bar{
       {"▏", "▎", "▍", "▌", "▋", "▊", "▉", "▊", "▋", "▌", "▍", "▎"},
       150,
       "Fetching files"};
 
   Config config;
   config.load();
-  size_t total_size = 0;
 
-  std::vector<std::string> files = listfiles_recursive(
-      home_dir, config.exception_list, config.min_file_size);
-  files.erase(std::remove_if(files.begin(), files.end(),
-                             [&](const std::string &path) {
-                               return !File::isfile(path) ||
-                                      File::getfilesize(path) <
-                                          config.min_file_size;
-                             }),
-              files.end());
+  std::vector<FileEntry> files;
+  collect_files(home_dir, config.exception_list, files, config.min_file_size);
 
-  loading_bar_fetching.setMsg("Sorting");
-  // sort ascendingly
-  std::sort(files.begin(), files.end(),
-            [](const std::string &a, const std::string &b) {
-              return File::getfilesize(a) < File::getfilesize(b);
-            });
+  loading_bar.setMsg("Sorting");
+  std::sort(
+      files.begin(), files.end(),
+      [](const FileEntry &a, const FileEntry &b) { return a.size < b.size; });
 
-  loading_bar_fetching.setMsg("Finding total size");
+  loading_bar.setMsg("Finding total size");
+  uint64_t total_size = 0;
   size_t largest_width = 0;
-  for (const auto &file : files) {
-    total_size += File::getfilesize(file);
-    if (file.size() > largest_width)
-      largest_width = file.size();
+  for (const auto &f : files) {
+    total_size += f.size;
+    largest_width = std::max(largest_width, f.path.size());
   }
-  loading_bar_fetching.stop();
+  loading_bar.stop();
   print("\r");
-  for (const auto &file : files) {
-    print(strutils::pad_right(file, largest_width), ": ",
-          numutils::bytes(File::getfilesize(file)), "\n");
-  }
-  if (files.empty()) {
+
+  for (const auto &f : files)
+    print(strutils::pad_right(f.path, largest_width), ": ",
+          numutils::bytes(f.size), "\n");
+
+  if (files.empty())
     print("No files were found.\n");
-  }
 
   print("\nShowing diagnosis for \"", home_dir, "\"\n");
   print("---------------------------------\nFound ", files.size(), " files.\n");
