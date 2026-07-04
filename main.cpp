@@ -10,6 +10,47 @@
 #include <vector>
 using funcs::print;
 
+void listfiles_recursive_internal(
+    const std::string &dir, const std::vector<std::string> &exception_list,
+    std::vector<std::string> &file_list, float min_file_size) {
+  if (!fs::exists(dir) || !fs::is_directory(dir))
+    return;
+
+  try {
+    for (const auto &entry : fs::directory_iterator(dir)) {
+      std::string current_path = entry.path().string();
+
+      // 1. Check exceptions
+      if (std::find(exception_list.begin(), exception_list.end(),
+                    current_path) != exception_list.end()) {
+        continue;
+      }
+
+      // 2. Distinguish between Files and Directories
+      if (fs::is_regular_file(entry.status()) &&
+          File::getfilesize(current_path) > min_file_size) {
+        file_list.push_back(current_path); // Only add actual files
+      } else if (fs::is_directory(entry.status())) {
+        // Recurse using the same vector reference
+        listfiles_recursive_internal(current_path, exception_list, file_list,
+                                     min_file_size);
+      }
+    }
+  } catch (const fs::filesystem_error &) {
+    // Log or ignore permission denied errors
+  }
+}
+
+// Public wrapper function
+std::vector<std::string>
+listfiles_recursive(const std::string &dir,
+                    const std::vector<std::string> &exception_list,
+                    float min_file_size) {
+  std::vector<std::string> result;
+  listfiles_recursive_internal(dir, exception_list, result, min_file_size);
+  return result;
+}
+
 struct Config {
   std::vector<std::string> exception_list; // exception_list.txt
   size_t min_file_size;
@@ -57,8 +98,8 @@ int main(int argc, char *argv[]) {
   config.load();
   size_t total_size = 0;
 
-  std::vector<std::string> files =
-      File::listfiles_recursive(home_dir, config.exception_list);
+  std::vector<std::string> files = listfiles_recursive(
+      home_dir, config.exception_list, config.min_file_size);
   files.erase(std::remove_if(files.begin(), files.end(),
                              [&](const std::string &path) {
                                return !File::isfile(path) ||
